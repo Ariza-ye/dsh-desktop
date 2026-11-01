@@ -1,3 +1,5 @@
+mod keyboard;
+
 use serde::Serialize;
 use std::{
     collections::VecDeque,
@@ -45,6 +47,50 @@ impl Default for DshState {
             exiting: false,
         }))
     }
+}
+
+// Only the running sidecar's top-level window receives shortcut capabilities.
+pub(crate) fn is_dsh_window(window: &tauri::WebviewWindow) -> bool {
+    if window.label() != "main" {
+        return false;
+    }
+    let Ok(url) = window.url() else { return false };
+    let state = window.state::<DshState>();
+    let inner = state.0.lock().unwrap();
+    inner.status.phase == "running"
+        && inner.dsh_origin.as_deref() == Some(url.origin().ascii_serialization().as_str())
+}
+
+fn keybindings_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    app.path().app_data_dir().map(|path| path.join("keybindings.json")).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn read_keybindings(window: tauri::WebviewWindow, app: tauri::AppHandle) -> Result<Option<String>, String> {
+    if !is_dsh_window(&window) { return Err("Untrusted shortcut window".into()); }
+    match std::fs::read_to_string(keybindings_path(&app)?) {
+        Ok(raw) => Ok(Some(raw)),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error.to_string()),
+    }
+}
+
+#[tauri::command]
+fn write_keybindings(window: tauri::WebviewWindow, app: tauri::AppHandle, raw: String) -> Result<(), String> {
+    if !is_dsh_window(&window) { return Err("Untrusted shortcut window".into()); }
+    if raw.len() > 1024 * 1024 { return Err("Shortcut configuration is too large".into()); }
+    serde_json::from_str::<serde_json::Value>(&raw).map_err(|e| e.to_string())?;
+    let path = keybindings_path(&app)?;
+    std::fs::create_dir_all(path.parent().ok_or("Missing configuration directory")?).map_err(|e| e.to_string())?;
+    let temporary = path.with_extension("json.tmp");
+    std::fs::write(&temporary, raw).map_err(|e| e.to_string())?;
+    std::fs::rename(temporary, path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn close_shortcut_window(window: tauri::WebviewWindow) -> Result<(), String> {
+    if !is_dsh_window(&window) { return Err("Untrusted shortcut window".into()); }
+    window.close().map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -164,6 +210,19 @@ fn start_dsh(app: &tauri::AppHandle) -> Result<(), String> {
                                         inner.status.phase = "running".into();
                                         inner.status.message = "DSH 服务已就绪".into();
                                     }
+                                    let capability = serde_json::json!({
+                                        "identifier": format!("dsh-shortcuts-{generation}"),
+                                        "description": "Shortcut bridge for this sidecar origin only",
+                                        "local": false,
+                                        "remote": { "urls": [format!("{}/*", url.origin().ascii_serialization())] },
+                                        "windows": ["main"],
+                                        "permissions": ["allow-desktop-shortcuts"]
+                                    });
+                                    if let Err(error) = handle.add_capability(capability.to_string()) {
+                                        show_failure(&handle, generation, format!("无法启用桌面快捷键：{error}"));
+                                        ready = true;
+                                        continue;
+                                    }
                                     ready = true;
                                     if let Some(window) = handle.get_webview_window("main") {
                                         if let Err(error) = window.navigate(url) {
@@ -237,7 +296,10 @@ pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .manage(DshState::default())
-        .invoke_handler(tauri::generate_handler![dsh_status, restart_dsh])
+        .invoke_handler(tauri::generate_handler![
+            dsh_status, restart_dsh, read_keybindings, write_keybindings,
+            close_shortcut_window, keyboard::keyboard_configure
+        ])
         .on_window_event(|window, event| {
             #[cfg(target_os = "macos")]
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
@@ -261,6 +323,10 @@ pub fn run() {
                     .title("DSH Desktop")
                     .inner_size(1280.0, 860.0)
                     .min_inner_size(800.0, 600.0)
+                    .initialization_script(format!(
+                        "if (window === window.top && location.protocol === 'http:' && location.hostname === '127.0.0.1' && location.port !== '1420') {{ {} }}",
+                        include_str!("desktop-bridge.js")
+                    ))
                     .on_navigation(move |url| {
                         let state = guard.state::<DshState>();
                         let inner = state.0.lock().unwrap();
@@ -279,6 +345,7 @@ pub fn run() {
                     .build()?;
             let local_url = window.url()?;
             handle.state::<DshState>().0.lock().unwrap().local_url = Some(local_url);
+            keyboard::install(&handle).map_err(std::io::Error::other)?;
             // A startup error stays visible in the local window and can be retried.
             let _ = start_dsh(&handle);
             Ok(())
@@ -296,7 +363,10 @@ pub fn run() {
                 let _ = window.set_focus();
             }
         }
-        RunEvent::ExitRequested { .. } => stop_dsh(app, true),
+        RunEvent::ExitRequested { .. } => {
+            keyboard::uninstall();
+            stop_dsh(app, true);
+        },
         _ => {}
     });
 }

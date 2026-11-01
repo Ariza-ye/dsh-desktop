@@ -10,13 +10,16 @@
     "dev:web": "vite --host 127.0.0.1 --port 1420 --strictPort",
     "build:web": "tsc --noEmit && vite build",
     "build:sidecar": "node scripts/build-sidecar.mjs",
-    "prepare:dev": "npm run build:sidecar && npm run dev:web",
-    "prepare:build": "npm run build:sidecar && npm run build:web",
-    "check": "tsc --noEmit && cargo check --locked --manifest-path src-tauri/Cargo.toml && cargo test --locked --manifest-path src-tauri/Cargo.toml",
+    "build:bridge": "node scripts/build-desktop-bridge.mjs",
+    "prepare:dev": "npm run build:bridge && npm run build:sidecar && npm run dev:web",
+    "prepare:build": "npm run build:bridge && npm run build:sidecar && npm run build:web",
+    "test:bridge": "node --test scripts/test-desktop-bridge.mjs",
+    "check": "npm run build:bridge && npm run test:bridge && tsc --noEmit && cargo check --locked --manifest-path src-tauri/Cargo.toml && cargo test --locked --manifest-path src-tauri/Cargo.toml",
     "test:sidecar": "python3 scripts/smoke-sidecar.py"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.12.4",
+    "esbuild": "^0.27.7",
     "typescript": "~5.9.3",
     "vite": "^7.3.1"
   },

@@ -67,12 +67,16 @@ DSH_EXECUTABLE=/opt/homebrew/bin/dsh npm run dev
 - 退出时先向 Sidecar stdin 写入关闭请求；桌面进程崩溃或被强制关闭后，stdin EOF 同样触发清理。
 - Unix 使用独立进程组，先发送 SIGTERM，最多等待 2 秒，再发送 SIGKILL。Windows 使用 Job Object 管理进程树。
 - 仅管理当前应用启动的进程，不复用或终止用户另外启动的 DSH。多个应用实例各自使用独立端口。
-- DSH Web 没有远程 Tauri IPC 授权，主窗口导航仅允许本地启动页和本次启动的 DSH origin。外部链接/新窗口、系统托盘、自动更新尚未接入。
+- 主窗口导航仅允许本地启动页和本次启动的 DSH origin。DSH 页面仅获得快捷键读写、按键配置和关闭窗口的 IPC 权限，命令会再次校验当前窗口和 origin；不开放 shell 权限。外部链接/新窗口、系统托盘、自动更新尚未接入。
+- macOS 原生按键监听支持录制和触发 `Cmd+N` 等组合键，只在当前 DSH 窗口获得焦点时生效。未绑定的按键保持系统行为，录键期间暂停快捷键触发。快捷键保存在应用数据目录的 `keybindings.json`（macOS 为 `~/Library/Application Support/com.dsh.desktop/keybindings.json`），与 Web 端的本地存储分开。
+- 桌面快捷键桥接在构建时复用当前安装 DSH 的快捷键协议；更换 DSH 大版本后应重新构建桌面应用。可通过 `DSH_PACKAGE_ROOT` 指定构建时使用的 DSH 包目录。
 - Unix 中主动脱离进程组的后代进程不在清理范围内；单独对 Sidecar 发送 SIGKILL 无法执行其退出清理。
 
 ## 验证
 
 ```bash
+npm run build:bridge
+node scripts/test-desktop-bridge.mjs
 npm run build:sidecar
 npm run build:web
 cargo check --locked --manifest-path src-tauri/Cargo.toml

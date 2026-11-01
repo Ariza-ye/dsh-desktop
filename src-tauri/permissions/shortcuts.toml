@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-desktop-shortcuts"
+description = "Read and edit shortcut preferences and configure keyboard interception for the DSH window."
+commands.allow = ["read_keybindings", "write_keybindings", "close_shortcut_window", "keyboard_configure"]
