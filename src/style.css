@@ -1,0 +1,16 @@
+:root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #e9ecf5; background: #11131b; font-synthesis: none; }
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; display: grid; place-items: center; }
+main { width: min(620px, 90vw); padding: 56px 24px; text-align: center; }
+.mark { display: block; margin: 0 auto 32px; width: 80px; height: 80px; object-fit: contain; }
+.eyebrow { color: #8a96be; font-size: 11px; letter-spacing: .2em; }
+h1 { font-size: 26px; font-weight: 600; margin: 18px 0 12px; }
+#message { color: #aab2c8; line-height: 1.8; overflow-wrap: anywhere; white-space: pre-wrap; }
+.spinner { width: 24px; height: 24px; border: 2px solid #343c5d; border-top-color: #9baaff; border-radius: 50%; margin: 32px auto; animation: spin 1s linear infinite; }
+button { margin-top: 20px; padding: 10px 24px; border: 1px solid #6578e8; border-radius: 8px; background: #29355e; color: inherit; cursor: pointer; }
+button:disabled { opacity: .5; }
+details { margin-top: 32px; text-align: left; color: #aab2c8; font-size: 13px; }
+pre { padding: 16px; background: #191d2a; border-radius: 8px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 280px; overflow: auto; }
+[hidden] { display: none !important; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }

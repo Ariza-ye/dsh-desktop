@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DSH Desktop</title>
+  </head>
+  <body>
+    <main>
+      <img class="mark" src="/assets/icon.png" alt="DSH Desktop" width="80" height="80" />
+      <p class="eyebrow">DEEPSEEK HARNESS</p>
+      <h1>正在启动 DSH</h1>
+      <p id="message" role="status">服务就绪后，将自动打开工作空间。</p>
+      <div id="spinner" class="spinner" aria-label="正在启动"></div>
+      <button id="retry" hidden>重新启动</button>
+      <details id="diagnostics" hidden>
+        <summary>查看诊断信息</summary>
+        <pre id="logs"></pre>
+      </details>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
